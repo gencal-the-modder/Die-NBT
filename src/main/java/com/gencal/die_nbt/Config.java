@@ -1,18 +1,15 @@
 package com.gencal.die_nbt;
 
-import net.minecraft.resources.ResourceLocation;
+import com.gencal.die_nbt.util.ConfigUtils;
+
 import net.minecraft.world.item.Item;
 import net.minecraftforge.common.ForgeConfigSpec;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.ModList;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.event.config.ModConfigEvent;
-import net.minecraftforge.registries.ForgeRegistries;
 
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
+import java.util.*;
+
 
 @Mod.EventBusSubscriber(modid = DieNbt.MODID, bus = Mod.EventBusSubscriber.Bus.MOD)
 public class Config
@@ -23,40 +20,73 @@ public class Config
             .comment("Whether 'Die NBT!' should log its actions")
             .define("enableLogging", false);
 
-    private static final ForgeConfigSpec.ConfigValue<List<? extends String>> ITEMS_TO_UNTAG_STRINGS = BUILDER
-            .comment("A list of items that should lose NBT tags on players death.")
-            .defineListAllowEmpty("itemsToUntag", List.of(), Config::validateItemName);
+    private static final ForgeConfigSpec.BooleanValue ENABLE_INVENTORY = BUILDER
+            .comment("Whether 'Die NBT!' should work on your inventory and offhand")
+            .define("enableInventory", true);
 
-    private static final ForgeConfigSpec.ConfigValue<List<? extends String>> MODS_TO_UNTAG_STRINGS = BUILDER
-            .comment("A list of mods from which items should lose NBT tags on players death.")
-            .defineListAllowEmpty("mods_to_untag", List.of(), Config::doesNamespaceExist);
+    private static final ForgeConfigSpec.BooleanValue ENABLE_ARMOR_SLOTS = BUILDER
+            .comment("Whether 'Die NBT!' should work on your armor slots")
+            .define("enableArmorSlots", true);
+
+    private static final ForgeConfigSpec.BooleanValue ENABLE_CURIOS = BUILDER
+            .comment("Whether 'Die NBT!' should work on curios slots")
+            .define("enableCurios", true);
+
+    private static final ForgeConfigSpec.ConfigValue<List<? extends ArrayList<Object>>> ITEMS_AND_FIELDS_STRINGS = BUILDER
+            .comment(
+                    """
+                    A list of keys - item names, and their values - NBT data fields, also known as tags, that should be erased on player's death.\
+                    
+                    Leave the value as an empty list if you want to completely erase NBT data from specific item\
+                    
+                    Please note that item-specific rules override mod-wide rules for that item\
+                    
+                    Example of the list: [ ["minecraft:diamond_sword", ["Damage", "Enchantments"]] ]
+                    """
+            )
+            .defineListAllowEmpty("itemsToFields", List.of(), ConfigUtils::validateItemFieldPair);
+
+    private static final ForgeConfigSpec.ConfigValue<List<? extends ArrayList<Object>>> MODS_AND_FIELDS_STRINGS = BUILDER
+            .comment(
+                    """
+                    A list of keys - mod names, and their values - NBT data fields, also known as tags, that should be erased on player's death.\
+                    
+                    Leave the value as an empty list if you want to completely erase NBT data from specific mod items\
+                    
+                    Example of the list: [ ["minecraft", ["Damage", "Enchantments"]] ]
+                    """
+            )
+            .defineListAllowEmpty("modsToFields", List.of(), ConfigUtils::validateNamespaceFieldPair);
 
     static final ForgeConfigSpec SPEC = BUILDER.build();
 
     public static boolean enableLogging;
-    public static Set<Item> itemsToUntag;
-    public static Set<String> modsToUntag;
+    public static boolean enableInventory;
+    public static boolean enableArmorSlots;
+    public static boolean enableCurios;
+    public static Set<Item> itemsToCheck;
+    public static Set<String> modsToCheck;
+    public static HashMap<Item, Set<String>> itemsToFields;
+    public static HashMap<String, Set<String>> modsToFields;
 
-    private static boolean validateItemName(final Object obj)
-    {
-        return obj instanceof final String itemName && ForgeRegistries.ITEMS.containsKey(new ResourceLocation(itemName));
-    }
-
-    private static boolean doesNamespaceExist(final Object obj) {
-        return obj instanceof final String namespace && ModList.get().isLoaded(namespace);
-    }
 
     @SubscribeEvent
     static void onLoad(final ModConfigEvent event)
     {
         enableLogging = ENABLE_LOGGING.get();
 
-        // convert the list of strings into a set of items
-        itemsToUntag = ITEMS_TO_UNTAG_STRINGS.get().stream()
-                .map(itemName -> ForgeRegistries.ITEMS.getValue(new ResourceLocation(itemName)))
-                .collect(Collectors.toSet());
+        enableInventory = ENABLE_INVENTORY.get();
 
-        modsToUntag = new HashSet<>(MODS_TO_UNTAG_STRINGS.get());
+        enableArmorSlots = ENABLE_ARMOR_SLOTS.get();
 
+        enableCurios = ENABLE_CURIOS.get();
+
+        itemsToCheck = ConfigUtils.collectItemsFromPairs(ITEMS_AND_FIELDS_STRINGS.get());
+
+        modsToCheck = ConfigUtils.collectNamespacesFromPairs(MODS_AND_FIELDS_STRINGS.get());
+
+        itemsToFields = ConfigUtils.mergeItemToFieldsMaps(ITEMS_AND_FIELDS_STRINGS.get());
+
+        modsToFields = ConfigUtils.mergeStringToFieldsMaps(MODS_AND_FIELDS_STRINGS.get());
     }
 }

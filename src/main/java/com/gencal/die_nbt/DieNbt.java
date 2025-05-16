@@ -13,6 +13,8 @@ import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import org.slf4j.Logger;
 
+import java.util.HashSet;
+
 @Mod(DieNbt.MODID)
 public class DieNbt
 {
@@ -34,22 +36,32 @@ public class DieNbt
     {
         if (Config.enableLogging) {
             LOGGER.info("[Die, NBT!] Logging was enabled!");
-            LOGGER.info("[Die, NBT!] The items that should be cleared from NBT data on death are:");
-            Config.itemsToUntag.forEach((item) -> LOGGER.info(item.toString()));
-            LOGGER.info("[Die, NBT!] The mods from which items that should be cleared from NBT data on death are:");
-            Config.modsToUntag.forEach((mod) -> LOGGER.info(mod));
+            LOGGER.info("[Die, NBT!] Mods from config: " + (Config.itemsToCheck.isEmpty() ? "" : Config.itemsToCheck.toString()));
+            LOGGER.info("[Die, NBT!] Items from config: " + (Config.modsToCheck.isEmpty() ? "" : Config.modsToCheck.toString()));
+            LOGGER.info("[Die, NBT!] Fields to clear by items: " + (Config.itemsToFields.isEmpty() ? "" : Config.itemsToFields.toString()));
+            LOGGER.info("[Die, NBT!] Fields to clear by mods: " + (Config.modsToFields.isEmpty() ? "" : Config.modsToFields.toString()));
+            LOGGER.info("[Die, NBT!] If you don't find some of the things you defined in config, that means that your config was incorrect");
         }
     }
 
-    public static boolean shouldItemsNbtDie(ItemStack itemStack) {
+    public static boolean shouldItemNbtDie(ItemStack itemStack) {
         Item item = itemStack.getItem();
         return (
-                Config.itemsToUntag.contains(item) ||
-                        (!Config.modsToUntag.isEmpty() &&
-                                Config.modsToUntag.contains(
-                                        BuiltInRegistries.ITEM.getKey(item).getNamespace()
-                                )
-                        )
+                Config.itemsToCheck.contains(item) ||
+                Config.modsToCheck.contains(
+                    BuiltInRegistries.ITEM.getKey(item).getNamespace()
+                )
         );
+    }
+
+    public static HashSet<String> getFieldsToClear(ItemStack itemStack) {
+        Item item = itemStack.getItem();
+        Object fieldsByItem = Config.itemsToFields.get(item);
+        Object fieldsByNamespace = Config.modsToFields.get(BuiltInRegistries.ITEM.getKey(item).getNamespace());
+        if (fieldsByItem == null) {
+            return (HashSet<String>) fieldsByNamespace;
+        } else {
+            return (HashSet<String>) fieldsByItem;
+        }
     }
 }
